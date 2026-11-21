@@ -18,6 +18,7 @@
 #endif
 
 #include <windows.h>
+#include <intrin.h>
 
 #include <algorithm>
 #include <cmath>

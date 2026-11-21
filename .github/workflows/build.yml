@@ -51,7 +51,25 @@ jobs:
       - name: Build vp-cristi (Release Win32)
         env:
           PLUGIN_SDK_DIR: ${{ github.workspace }}\plugin-sdk
-        run: msbuild Volumetric-Particles.vcxproj /p:Configuration=Release /p:Platform=Win32 /m
+        shell: cmd
+        run: |
+          msbuild Volumetric-Particles.vcxproj /p:Configuration=Release /p:Platform=Win32 /m /flp1:logfile=build.log;errorsonly;verbosity=normal
+          exit /b %ERRORLEVEL%
+
+      # surface build errors as GitHub annotations (readable via API)
+      - name: Report build errors
+        if: failure()
+        shell: pwsh
+        run: |
+          if (Test-Path build.log) {
+            foreach ($l in Get-Content build.log) {
+              if ($l -match '^(.*)\((\d+),?(\d+)?\): (error \w+): (.*)$') {
+                "::error file=$($Matches[1]),line=$($Matches[2)],col=$($Matches[3]):$($Matches[4]): $($Matches[5])"
+              } elseif ($l -match 'error') {
+                "::error $($l)"
+              }
+            }
+          }
 
       - name: Stage binaries
         shell: pwsh
