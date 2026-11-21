@@ -416,7 +416,7 @@ namespace vp
             //   view rows = RW viewMatrix (right/up/at rows, pos column)
             //   proj = [1/vw.x, 1/vw.y, znear/far D3D perspective]
             const RwMatrix& vm = cam->viewMatrix;
-            const RwV2   vw   = *RwCameraGetViewWindow(cam);
+            const RwV2d vw = *RwCameraGetViewWindow(cam);
             const float  zn   = RwCameraGetNearClipPlane(cam);
             const float  zf   = RwCameraGetFarClipPlane(cam);
             const float  xs   = (vw.x > 0.0001f) ? 1.0f / vw.x : 1.0f;
