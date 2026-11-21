@@ -437,8 +437,7 @@ namespace vp
             s_dev->GetPixelShader(&oldPS);
             s_dev->GetTexture(0, &oldTex0);
             s_dev->GetStreamSource(0, &oldVB, &oldStreamOff, &oldStride);
-            UINT oldIBCount = 0;
-            s_dev->GetIndices(&oldIB, &oldIBCount);
+            s_dev->GetIndices(&oldIB);
             s_dev->GetFVF(&oldFVF);
             s_dev->GetSamplerState(0, D3DSAMP_MINFILTER, &sam0Min);
             s_dev->GetSamplerState(0, D3DSAMP_MAGFILTER, &sam0Mag);
