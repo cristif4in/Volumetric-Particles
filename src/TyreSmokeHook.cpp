@@ -40,9 +40,10 @@ namespace vp
         if (!veh)
             return false;
 
-        // FindPlayerVehicle() works in both SP and SA:MP (client side):
-        // it returns the ped/vehicle the local player is in.
-        CVehicle* local = FindPlayerVehicle();
+        // The player-info lookup works in both SP and SA:MP (client side):
+        // it returns the vehicle the local player is in. plugin-sdk master
+        // removed FindPlayer.h, so resolve it from CWorld directly.
+        CVehicle* local = CWorld::Players[CWorld::PlayerInFocus].m_pPed->m_pVehicle;
         if (veh == local)
             return true;
 

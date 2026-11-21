@@ -35,4 +35,4 @@
 #include "CTimeCycle.h"
 #include "CVehicle.h"
 #include "CGeneral.h"
-#include "FindPlayer.h"
+#include "CWorld.h"
