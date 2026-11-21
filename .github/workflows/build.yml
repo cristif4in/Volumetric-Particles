@@ -60,6 +60,16 @@ jobs:
           powershell -NoProfile -Command "foreach ($l in Get-Content msb.txt) { if ($l -match ': error|LNK[0-9]|MSB[0-9]|C1[0-9]{3}') { Write-Host ('::error ' + $l) } }"
           exit /b %EXITCODE%
 
+      - name: Upload build logs (debug)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build.log
+            msb.txt
+          if-no-files-found: ignore
+
       - name: Stage binaries
         shell: pwsh
         run: |
