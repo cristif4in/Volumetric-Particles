@@ -3,7 +3,7 @@
  *
  *  PROJECT:     Volumetric-Particles (vp-cristi)
  *  FILE:        src/pch.h
- *  PURPOSE:     Precompiled header / global includes
+ *  
  *
  *  Credits:     cristif4in
  *               Server Redtimes Romania Project

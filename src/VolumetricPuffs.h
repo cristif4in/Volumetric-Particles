@@ -2,15 +2,6 @@
  *
  *  PROJECT:     Volumetric-Particles (vp-cristi)
  *  FILE:        src/VolumetricPuffs.h
- *  PURPOSE:     The volumetric smoke volume pool + simulation.
- *
- *  This re-implements the *behaviour* of the GfX Volumetrics (BeamNG)
- *  tyre smoke inside SA's constraints:
- *    - density is injected at the wheel contact point while the tyre slips
- *    - puffs inherit the car velocity (they "stay in the world as you drive on")
- *    - buoyancy + wind advection + dissipation
- *    - the "volumetric" look is produced by the renderer slicing each puff
- *      through its volume (see VolumetricRenderer)
  *
  *  Credits:     cristif4in
  *               Server Redtimes Romania Project

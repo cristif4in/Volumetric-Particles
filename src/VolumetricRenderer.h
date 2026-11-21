@@ -2,7 +2,6 @@
  *
  *  PROJECT:     Volumetric-Particles (vp-cristi)
  *  FILE:        src/VolumetricRenderer.h
- *  PURPOSE:     Renders the puff pool as sliced volumes (fake raymarch).
  *
  *  Credits:     cristif4in
  *               Server Redtimes Romania Project

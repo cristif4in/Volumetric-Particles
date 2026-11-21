@@ -2,27 +2,6 @@
  *
  *  PROJECT:     Volumetric-Particles (vp-cristi)
  *  FILE:        src/VolumetricRenderer.cpp
- *  PURPOSE:     Sliced-volume rendering of the tyre smoke puffs.
- *
- *  RenderWare on DX9 gives us no compute shaders / render targets worth
- *  abusing for a real voxel sim (that is the limitation we live with), so
- *  the raymarch is done analytically:
- *
- *    Every puff is an ellipsoid of constant density. We cut it with
- *    N quads perpendicular to the camera's view direction ("slices" =
- *    uniform raymarch steps). Each slice is textured with a procedurally
- *    generated soft noise raster, tinted by the current timecycle
- *    ambient/sun colours, and alpha-blended back-to-front. The accumulated
- *    slices read exactly like a low-step raymarched volume - smoke that
- *    wraps around the tyre and has real thickness, not a flat sprite.
- *
- *  The lighting math follows CloudWorks (Brian Tu / RTU, GTA SA volumetric
- *  clouds, DX9 HLSL - proof that SA can do real volumetrics):
- *    - Beer-Lambert extinction is accumulated per slice
- *      (CloudWorks: fx.y += c_dens; fx.z = exp(-fx.y))
- *    - self-shadowing towards the sun is estimated analytically through the
- *      ellipsoid instead of CloudWorks' ShadowMarching loop
- *    - a Mie-phase term (dot(sunDir, camDir)) gives the silver-lining glow
  *
  *  Credits:     cristif4in
  *               Server Redtimes Romania Project

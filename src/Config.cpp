@@ -2,7 +2,6 @@
  *
  *  PROJECT:     Volumetric-Particles (vp-cristi)
  *  FILE:        src/Config.cpp
- *  PURPOSE:     ini loading (plugin-sdk helpers, like RedtimesUI does)
  *
  *  Credits:     cristif4in
  *               Server Redtimes Romania Project

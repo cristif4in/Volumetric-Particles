@@ -1,29 +1,12 @@
-/*****************************************************************************
+/****************************************************************************
  *
  *  PROJECT:     Volumetric-Particles (vp-cristi)
  *  FILE:        src/Main.cpp
- *  PURPOSE:     Plugin entry point - wires the events together.
- *
- *  What this mod does:
- *      Replaces the tyre smoke of the vehicle YOU are driving with a
- *      volumetric approximation of GfX Volumetrics' tyre smoke:
- *      puff volumes injected at the slipping wheel contacts, advected by
- *      the car velocity + wind, buoyant, dissipating, rendered as
- *      CloudWorks-style lit sliced volumes.
- *
- *  Multiplayer (SA:MP):
- *      Everything is client-side. Only the locally driven vehicle's smoke
- *      is replaced; every other vehicle keeps the stock GTA SA tyre smoke,
- *      exactly as you asked (other players also see stock smoke from you,
- *      since nothing is synced).
  *
  *  Credits:     cristif4in
  *               Server Redtimes Romania Project
  *
- *  Built the same way as RedtimesUI (The-Definitive-UI): plugin-sdk ASI
- *  plugin for GTA SA 1.0 US, hooks via plugin::patch.
- *
- *****************************************************************************/
+ ****************************************************************************/
 
 #include "pch.h"
 #include "Config.h"

@@ -2,20 +2,6 @@
  *
  *  PROJECT:     Volumetric-Particles (vp-cristi)
  *  FILE:        src/TyreSmokeHook.cpp
- *  PURPOSE:     Detours on the SA tyre-smoke path (reversed with gta-reversed):
- *
- *               CVehicle::AddSingleWheelParticles  -> 0x6DE880
- *                   ... is the ONLY place the game spawns the tyre smoke:
- *                       WHEEL_STATE_SPINNING / WHEEL_STATE_SKIDDING
- *                       -> g_fx.m_SmokeII3expand->AddParticle(...)
- *               FxSystem_c::AddParticle(const CVector& ...) -> 0x4AA440
- *
- *  Strategy: hook both. The AddSingleWheelParticles detour only remembers
- *  which vehicle is currently being processed. The AddParticle detour then
- *  filters by RETURN ADDRESS (the tyre smoke AddParticle calls originate
- *  inside 0x6DE880..0x6DFB80): for the LOCAL vehicle those calls are
- *  swallowed and converted into volumetric puffs; everything else
- *  (exhaust, dirt, other players' smoke in SA:MP) passes through untouched.
  *
  *  Credits:     cristif4in
  *               Server Redtimes Romania Project

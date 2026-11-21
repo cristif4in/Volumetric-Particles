@@ -2,7 +2,6 @@
  *
  *  PROJECT:     Volumetric-Particles (vp-cristi)
  *  FILE:        src/Config.h
- *  PURPOSE:     vp-cristi.ini settings
  *
  *  Credits:     cristif4in
  *               Server Redtimes Romania Project
