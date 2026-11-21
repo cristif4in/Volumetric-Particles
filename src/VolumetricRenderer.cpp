@@ -194,6 +194,19 @@ namespace vp
             // slice quad scratch buffers (built per puff)
             static RwIm3DVertex s_verts[MAX_SLICES * 4];
 
+            // one-time diagnostics: how many puffs are visible & do the IM3D
+            // calls actually succeed?
+            int activeCount = 0;
+            for (int i = 0; i < count; i++)
+                if (puffs[i].active)
+                    activeCount++;
+            static int s_diagLogs = 0;
+            static int s_cullLogs = 0;
+            const bool diagThisFrame = (s_diagLogs < 3) && (activeCount > 0);
+            if (diagThisFrame)
+                s_diagLogs++;
+            int drawnCount = 0;
+
             for (int i = 0; i < count; i++)
             {
                 const auto& p = puffs[i];
@@ -279,7 +292,8 @@ namespace vp
 
                 // draw this puff (indices cover only the used slices:
                 // they are laid out for MAX_SLICES, so regenerate the tail)
-                RwIm3DTransform(s_verts, vi, &identity, rwIM3D_VERTEXRGBA);
+                void* im3d = RwIm3DTransform(s_verts, vi, &identity, rwIM3D_VERTEXRGBA);
+                RwBool primOk = FALSE;
                 {
                     int ii = 0;
                     RwImVertexIndex idx[(MAX_SLICES - 1) * 6];
@@ -289,9 +303,21 @@ namespace vp
                         idx[ii++] = q + 0; idx[ii++] = q + 1; idx[ii++] = q + 2;
                         idx[ii++] = q + 0; idx[ii++] = q + 2; idx[ii++] = q + 3;
                     }
-                    RwIm3DRenderIndexedPrimitive(rwPRIMTYPETRILIST, idx, ii);
+                    primOk = RwIm3DRenderIndexedPrimitive(rwPRIMTYPETRILIST, idx, ii);
                 }
                 RwIm3DEnd();
+                drawnCount++;
+
+                if (diagThisFrame && i == 0)
+                {
+                    Log("render diag: active=%d im3d=%p primOk=%d camPos=(%.1f,%.1f,%.1f) "
+                        "puff=(%.1f,%.1f,%.1f) distSq=%.0f radius=%.2f alpha=%.3f sliceA=%.3f "
+                        "slices=%d tint=(%d,%d,%d)",
+                        activeCount, im3d, (int)primOk,
+                        camPos.x, camPos.y, camPos.z,
+                        p.pos.x, p.pos.y, p.pos.z, distSq, p.radius,
+                        puffAlpha, sliceAlpha, sliceCount, tintR, tintG, tintB);
+                }
             }
 
             // ------------------------------------------------ restore states
@@ -305,6 +331,24 @@ namespace vp
             RwRenderStateSet(rwRENDERSTATETEXTUREFILTER,      savedTexFilter);
             RwRenderStateSet(rwRENDERSTATEALPHATESTFUNCTION,  savedAlphaTest);
             RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE,  savedVtxAlpha);
+
+            if (diagThisFrame && drawnCount == 0)
+            {
+                // every puff was culled before drawing - dump why
+                for (int i = 0; i < count && s_cullLogs < 6; i++)
+                {
+                    if (!puffs[i].active) continue;
+                    const float t = puffs[i].age / puffs[i].lifetime;
+                    const float env = std::clamp(t * 4.0f, 0.0f, 1.0f) * std::exp(-t * 2.4f);
+                    const float distSq = (puffs[i].pos - camPos).MagnitudeSqr();
+                    Log("cull diag: puff age=%.2f life=%.2f alpha=%.3f env=%.3f distSq=%.0f "
+                        "camPos=(%.1f,%.1f,%.1f) puff=(%.1f,%.1f,%.1f)",
+                        puffs[i].age, puffs[i].lifetime, puffs[i].alpha, env, distSq,
+                        camPos.x, camPos.y, camPos.z,
+                        puffs[i].pos.x, puffs[i].pos.y, puffs[i].pos.z);
+                    s_cullLogs++;
+                }
+            }
         }
     }
 }
