@@ -80,6 +80,7 @@ namespace vp
             p.pos.z = pos.z + 0.05f + FastRandom01() * 0.1f;
 
             p.seed = s_seed;
+            p.groundZ = pos.z - 0.15f; // road surface estimate for soft ground fade
         }
 
         // ------------------------------------------------------- simulate

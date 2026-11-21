@@ -29,6 +29,7 @@ namespace vp
             float   alpha;       // base opacity at spawn (already scaled by density/emission)
             float   brightness;  // road brightness passed by the game (lightMult)
             uint32  seed;        // random seed for the per-puff noise rotation
+            float   groundZ;     // world Y of the road under this puff (soft ground fade)
             bool    active;
         };
 

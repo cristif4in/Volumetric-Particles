@@ -13,6 +13,7 @@
 #include "TyreSmokeHook.h"
 #include "VolumetricPuffs.h"
 #include "VolumetricRenderer.h"
+#include "RaySmoke.h"
 
 // SEH wrapper - __try cannot live in a function with unwinding C++ objects,
 // and the event lambdas would trigger C2712. Keeps the game alive when the
@@ -69,23 +70,24 @@ public:
             vp::Log("shutdownRwEvent: releasing renderer + puffs");
             vp::VolumetricRenderer::Shutdown();
             vp::VolumetricPuffs::Shutdown();
+            vp::RaySmoke::Shutdown();
         };
 
-        // D3D device lost/restored - the noise raster must be rebuilt
+        // D3D device lost/restored - the noise raster + D3D resources must be rebuilt
         plugin::Events::d3dLostEvent += []() {
-            vp::Log("d3dLostEvent: releasing raster");
+            vp::Log("d3dLostEvent: releasing raster + D3D resources");
             vp::VolumetricRenderer::Shutdown();
+            vp::RaySmoke::Shutdown();
         };
         plugin::Events::d3dResetEvent += []() {
             vp::Log("d3dResetEvent: rebuilding raster");
             vp::VolumetricRenderer::Init();
         };
 
-        // per-frame: simulate + draw.
+        // per-frame: simulate in drawingEvent.
         // NOTE: plugin-sdk master's gameProcessEvent does NOT fire under
         // SA:MP (confirmed via logs - zero ticks while drawingEvent fires
-        // every frame), so both steps run here. Update-before-Render keeps
-        // the simulation one frame ahead of what is drawn.
+        // every frame).
         plugin::Events::drawingEvent += []() {
             static int s_draw = 0;
             const int n = ++s_draw;
@@ -96,7 +98,17 @@ public:
                 vp::Log("drawingEvent %d dt=%.5f (cam=%p)",
                         n, dt, (void*)TheCamera.m_pRwCamera);
             SafeUpdate(dt);
-            SafeRender();
+        };
+
+        // draw INSIDE the scene render: drawingEvent fires in the HUD phase,
+        // after the camera update has ended, and IM3D vertices projected with
+        // no active camera produce zero pixels (confirmed: primOk=1 but
+        // nothing on screen). renderEffectsEvent fires at the RenderEffects
+        // call inside the camera update - exactly where world effects belong.
+        plugin::Events::renderEffectsEvent += []() {
+            // ray-marched D3D9 volumes first; IM3D slices as fallback
+            if (!vp::RaySmoke::Render())
+                SafeRender();
         };
     }
 } volumetricParticlesPlugin;
