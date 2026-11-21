@@ -26,11 +26,15 @@ namespace vp
     static CVector   g_lastCarVelocity;              // cached m_vecMoveSpeed for puff inheritance
 
     // ------------------------------------------------------------ originals
-    // master's CVehicle.h declares AddSingleWheelParticles with
-    // (tWheelState, unsigned, float, float, CColPoint*, CVector*, float, int,
-    // unsigned surfaceType, bool*, unsigned) - eCarWheel no longer exists
+    // master's CVehicle.h declares AddSingleWheelParticles with 11 stack
+    // args: (tWheelState, unsigned, float, float, CColPoint*, CVector*,
+    // float, int, unsigned surfaceType, bool*, unsigned). The old SDK's
+    // 10-arg declaration is missing 'surfaceType' - hooking with it pops
+    // 40 of the 44 pushed bytes, corrupts the caller's stack and trips
+    // the /GS cookie (__fastfail bypasses SEH, hence the silent crash).
     typedef bool(__thiscall* AddSingleWheelParticles_t)(CVehicle*, tWheelState, uint32, float, float,
-                                                        CColPoint&, CVector&, float, int, bool&, uint32);
+                                                        CColPoint&, CVector&, float, int, uint32,
+                                                        bool&, uint32);
     typedef void(__thiscall* AddParticle_t)(FxSystem_c*, const CVector&, const CVector&, float,
                                             const FxPrtMult_c&, float, float, float, bool);
 
@@ -109,7 +113,7 @@ namespace vp
     static bool CallOriginalWheels(CVehicle* self,
         tWheelState wheelState, uint32 wheelStatus, float suspRatio, float speed,
         CColPoint& colPoint, CVector& pos, float outsideVector_unused,
-        int wheelIndex, bool& bloodState, uint32 flags)
+        int wheelIndex, uint32 surfaceType, bool& bloodState, uint32 flags)
     {
         const bool wasInstalled = s_hookWheels.installed;
         if (wasInstalled)
@@ -119,7 +123,7 @@ namespace vp
         {
             result = org_AddSingleWheelParticles(self, wheelState, wheelStatus, suspRatio, speed,
                                                  colPoint, pos, outsideVector_unused,
-                                                 wheelIndex, bloodState, flags);
+                                                 wheelIndex, surfaceType, bloodState, flags);
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
         {
@@ -171,7 +175,7 @@ namespace vp
         CVehicle* self, void* /*edx*/,
         tWheelState wheelState, uint32 wheelStatus, float suspRatio, float speed,
         CColPoint& colPoint, CVector& pos, float outsideVector_unused,
-        int wheelIndex, bool& bloodState, uint32 flags)
+        int wheelIndex, uint32 surfaceType, bool& bloodState, uint32 flags)
     {
         __try
         {
@@ -196,7 +200,7 @@ namespace vp
 
         return CallOriginalWheels(self, wheelState, wheelStatus, suspRatio, speed,
                                   colPoint, pos, outsideVector_unused,
-                                  wheelIndex, bloodState, flags);
+                                  wheelIndex, surfaceType, bloodState, flags);
     }
 
     static void __fastcall Our_AddParticle(
