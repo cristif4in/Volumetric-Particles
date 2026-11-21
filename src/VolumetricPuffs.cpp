@@ -114,7 +114,7 @@ namespace vp
 
         void Update(float dt)
         {
-            dt = std::clamp(dt, 0.0f, 0.1f); // guard against pauses/alt-tab spikes
+            dt = std::clamp(dt, 0.0f, 0.5f); // guard against pauses/alt-tab spikes (seconds)
             if (!g_cfg.bEnabled)
                 return;
 

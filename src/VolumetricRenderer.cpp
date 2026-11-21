@@ -232,8 +232,9 @@ namespace vp
                 const int sliceCount = distSq > 40.0f * 40.0f ? std::max(3, slices / 2) : slices;
 
                 // alpha per slice, compensated so N overlapping slices add up
-                // to roughly the puff's target opacity
-                const float sliceAlpha = 1.0f - std::pow(1.0f - puffAlpha, 1.0f / (float)sliceCount);
+                // to roughly the puff's target opacity (x1.5 gain so the
+                // plume actually reads on screen; tune down if too heavy)
+                const float sliceAlpha = std::min(1.0f, (1.0f - std::pow(1.0f - puffAlpha, 1.0f / (float)sliceCount)) * 1.5f);
 
                 // CloudWorks' Mie phase: silver lining when looking towards the sun.
                 // (CloudAtRay: c_bright * fx.x * MiePhase(suncross))

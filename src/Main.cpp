@@ -89,10 +89,13 @@ public:
         plugin::Events::drawingEvent += []() {
             static int s_draw = 0;
             const int n = ++s_draw;
+            // SA's CTimer::ms_fTimeStep is in 1/50s ticks (1.0 at 50fps),
+            // not seconds - confirmed by the tick-rate logs
+            const float dt = CTimer::ms_fTimeStep / 50.0f;
             if (n <= 100 || (n % 500) == 0)
                 vp::Log("drawingEvent %d dt=%.5f (cam=%p)",
-                        n, CTimer::ms_fTimeStep, (void*)TheCamera.m_pRwCamera);
-            SafeUpdate(CTimer::ms_fTimeStep);
+                        n, dt, (void*)TheCamera.m_pRwCamera);
+            SafeUpdate(dt);
             SafeRender();
         };
     }
