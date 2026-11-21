@@ -114,9 +114,18 @@ namespace vp
         const bool wasInstalled = s_hookWheels.installed;
         if (wasInstalled)
             ApplyHook(s_hookWheels, false); // original code back in place
-        const bool result = org_AddSingleWheelParticles(self, wheelState, wheelStatus, suspRatio, speed,
-                                                        colPoint, pos, outsideVector_unused,
-                                                        wheelIndex, bloodState, flags);
+        bool result = false;
+        __try
+        {
+            result = org_AddSingleWheelParticles(self, wheelState, wheelStatus, suspRatio, speed,
+                                                 colPoint, pos, outsideVector_unused,
+                                                 wheelIndex, bloodState, flags);
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            Log("!!! EXCEPTION 0x%08X inside original AddSingleWheelParticles (veh=%p wheel=%d)",
+                GetExceptionCode(), (void*)self, wheelIndex);
+        }
         if (wasInstalled)
             ApplyHook(s_hookWheels, true);
         return result;
@@ -130,9 +139,32 @@ namespace vp
         const bool wasInstalled = s_hookAddParticle.installed;
         if (wasInstalled)
             ApplyHook(s_hookAddParticle, false);
-        org_AddParticle(self, pos, vel, timeSince, fxMults, rotZ, lightMult, lightMultLimit, createLocal);
+        __try
+        {
+            org_AddParticle(self, pos, vel, timeSince, fxMults, rotZ, lightMult, lightMultLimit, createLocal);
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            Log("!!! EXCEPTION 0x%08X inside original FxSystem::AddParticle", GetExceptionCode());
+        }
         if (wasInstalled)
             ApplyHook(s_hookAddParticle, true);
+    }
+
+    // SEH wrapper - SpawnFromTyre is C++, so its __try must live here
+    static void SafeSpawnFromTyre(const CVector& pos, const CVector& vanillaVel,
+                                  const FxPrtMult_c& mults, float lightMult,
+                                  const CVector& carVelocity, CVehicle* veh)
+    {
+        __try
+        {
+            VolumetricPuffs::SpawnFromTyre(pos, vanillaVel, mults, lightMult, carVelocity, veh);
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            Log("!!! EXCEPTION 0x%08X in SpawnFromTyre - disabling tyre interception", GetExceptionCode());
+            g_currentIsLocal = false;
+        }
     }
 
     static bool __fastcall Our_AddSingleWheelParticles(
@@ -141,10 +173,26 @@ namespace vp
         CColPoint& colPoint, CVector& pos, float outsideVector_unused,
         int wheelIndex, bool& bloodState, uint32 flags)
     {
-        // remember context so the AddParticle detour can attribute puffs
-        g_currentVehicle = self;
-        g_currentIsLocal = g_cfg.bEnabled && (!g_cfg.bLocalVehicleOnly || IsLocalDrivenVehicle(self));
-        g_lastCarVelocity = self->m_vecMoveSpeed;
+        __try
+        {
+            // remember context so the AddParticle detour can attribute puffs
+            g_currentVehicle = self;
+            g_currentIsLocal = self && g_cfg.bEnabled
+                               && (!g_cfg.bLocalVehicleOnly || IsLocalDrivenVehicle(self));
+            g_lastCarVelocity = self->m_vecMoveSpeed;
+            static bool s_firstHit = false;
+            if (!s_firstHit)
+            {
+                s_firstHit = true;
+                Log("wheel detour first hit veh=%p local=%d wheel=%d",
+                    (void*)self, (int)g_currentIsLocal, wheelIndex);
+            }
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            Log("!!! EXCEPTION 0x%08X in Our_AddSingleWheelParticles prologue (veh=%p)",
+                GetExceptionCode(), (void*)self);
+        }
 
         return CallOriginalWheels(self, wheelState, wheelStatus, suspRatio, speed,
                                   colPoint, pos, outsideVector_unused,
@@ -170,7 +218,7 @@ namespace vp
                 if (s_spawnLogs++ < 5)
                     Log("SpawnFromTyre #%d pos=(%.1f,%.1f,%.1f) veh=%p light=%.2f",
                         s_spawnLogs, pos.x, pos.y, pos.z, (void*)g_currentVehicle, lightMult);
-                VolumetricPuffs::SpawnFromTyre(pos, vel, fxMults, lightMult, g_lastCarVelocity, g_currentVehicle);
+                SafeSpawnFromTyre(pos, vel, fxMults, lightMult, g_lastCarVelocity, g_currentVehicle);
                 return; // vanilla smoke suppressed for the local vehicle
             }
         }
