@@ -1,0 +1,62 @@
+name: Build vp-cristi
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PLUGIN_SDK_VERSION: master
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout mod source
+        uses: actions/checkout@v4
+
+      # plugin-sdk (same dependency RedtimesUI / The-Definitive-UI uses)
+      - name: Checkout plugin-sdk
+        uses: actions/checkout@v4
+        with:
+          repository: DK22Pac/plugin-sdk
+          ref: ${{ env.PLUGIN_SDK_VERSION }}
+          path: plugin-sdk
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build plugin-sdk (plugin_sa Release)
+        working-directory: plugin-sdk
+        run: msbuild plugin_sa.sln /p:Configuration=Release /p:Platform=Win32 /m
+
+      - name: Build vp-cristi (Release Win32)
+        env:
+          PLUGIN_SDK_DIR: ${{ github.workspace }}\plugin-sdk
+        run: msbuild Volumetric-Particles.vcxproj /p:Configuration=Release /p:Platform=Win32 /m
+
+      - name: Stage binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item plugin-sdk\output\Volumetric-Particles\Release\vp-cristi.dll dist\vp-cristi.asi
+          Copy-Item plugin-sdk\output\Volumetric-Particles\Release\vp-cristi.dll dist\vp-cristi.dll
+          Copy-Item vp-cristi.ini dist\vp-cristi.ini
+          Get-ChildItem dist
+
+      # the dll and the asi are the SAME binary - SA loads .asi, some
+      # launchers (and people who rename) prefer .dll, so we ship both
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vp-cristi
+          path: dist/
+
+      - name: Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
