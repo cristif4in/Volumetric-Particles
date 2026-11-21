@@ -55,9 +55,8 @@ jobs:
         run: |
           msbuild Volumetric-Particles.vcxproj /p:Configuration=Release /p:Platform=Win32 /m /flp1:logfile=build.log;errorsonly > msb.txt 2>&1
           set EXITCODE=%ERRORLEVEL%
-          if not exist build.log echo ##[error]build.log was not created - dumping console instead
           if exist build.log powershell -NoProfile -Command "foreach ($l in Get-Content build.log) { Write-Host ('##[error]' + $l) }"
-          powershell -NoProfile -Command "foreach ($l in Get-Content msb.txt) { if ($l -match ': error|LNK[0-9]|MSB[0-9]') { Write-Host ('##[error]' + $l) } }"
+          type msb.txt
           exit /b %EXITCODE%
 
       - name: Upload build logs (debug)
