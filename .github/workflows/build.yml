@@ -70,6 +70,14 @@ jobs:
             msb.txt
           if-no-files-found: ignore
 
+      - name: Annotation channel test
+        if: always()
+        shell: cmd
+        run: |
+          echo ::error TEST-cmd-echo
+          echo ##[error]TEST-cmd-hash
+          powershell -NoProfile -Command "Write-Host ('::error TEST-pwsh')"
+
       - name: Stage binaries
         shell: pwsh
         run: |
