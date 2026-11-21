@@ -194,18 +194,23 @@ namespace vp
             // slice quad scratch buffers (built per puff)
             static RwIm3DVertex s_verts[MAX_SLICES * 4];
 
-            // one-time diagnostics: how many puffs are visible & do the IM3D
-            // calls actually succeed?
+            // verbose diagnostics: every frame with active puffs
             int activeCount = 0;
             for (int i = 0; i < count; i++)
                 if (puffs[i].active)
                     activeCount++;
-            static int s_diagLogs = 0;
-            static int s_cullLogs = 0;
-            const bool diagThisFrame = (s_diagLogs < 3) && (activeCount > 0);
-            if (diagThisFrame)
-                s_diagLogs++;
+            static unsigned s_diagFrame = 0;
+            const bool verbose = (activeCount > 0);
+            if (verbose)
+            {
+                const unsigned f = ++s_diagFrame;
+                if (f <= 60 || (f % 60) == 0)
+                    Log("render f%u active=%d camPos=(%.1f,%.1f,%.1f) fwd=(%.2f,%.2f,%.2f) tint=(%d,%d,%d)",
+                        f, activeCount, camPos.x, camPos.y, camPos.z,
+                        camFwd.x, camFwd.y, camFwd.z, tintR, tintG, tintB);
+            }
             int drawnCount = 0;
+            int primFails = 0;
 
             for (int i = 0; i < count; i++)
             {
@@ -307,16 +312,13 @@ namespace vp
                 }
                 RwIm3DEnd();
                 drawnCount++;
+                if (!primOk)
+                    primFails++;
 
-                if (diagThisFrame && i == 0)
+                if (verbose && (s_diagFrame % 60) == 1 && i == 0)
                 {
-                    Log("render diag: active=%d im3d=%p primOk=%d camPos=(%.1f,%.1f,%.1f) "
-                        "puff=(%.1f,%.1f,%.1f) distSq=%.0f radius=%.2f alpha=%.3f sliceA=%.3f "
-                        "slices=%d tint=(%d,%d,%d)",
-                        activeCount, im3d, (int)primOk,
-                        camPos.x, camPos.y, camPos.z,
-                        p.pos.x, p.pos.y, p.pos.z, distSq, p.radius,
-                        puffAlpha, sliceAlpha, sliceCount, tintR, tintG, tintB);
+                    Log("render puff0 im3d=%p primOk=%d distSq=%.0f radius=%.2f puffAlpha=%.3f sliceA=%.3f slices=%d",
+                        im3d, (int)primOk, distSq, p.radius, puffAlpha, sliceAlpha, sliceCount);
                 }
             }
 
@@ -332,21 +334,20 @@ namespace vp
             RwRenderStateSet(rwRENDERSTATEALPHATESTFUNCTION,  savedAlphaTest);
             RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE,  savedVtxAlpha);
 
-            if (diagThisFrame && drawnCount == 0)
+            if (verbose && ((s_diagFrame % 60) == 1 || (drawnCount == 0 && primFails == 0)))
             {
-                // every puff was culled before drawing - dump why
-                for (int i = 0; i < count && s_cullLogs < 6; i++)
+                // nothing drawn? dump the cull reasons for the first active puffs
+                int dumped = 0;
+                for (int i = 0; i < count && dumped < 3; i++)
                 {
                     if (!puffs[i].active) continue;
                     const float t = puffs[i].age / puffs[i].lifetime;
                     const float env = std::clamp(t * 4.0f, 0.0f, 1.0f) * std::exp(-t * 2.4f);
-                    const float distSq = (puffs[i].pos - camPos).MagnitudeSqr();
-                    Log("cull diag: puff age=%.2f life=%.2f alpha=%.3f env=%.3f distSq=%.0f "
-                        "camPos=(%.1f,%.1f,%.1f) puff=(%.1f,%.1f,%.1f)",
-                        puffs[i].age, puffs[i].lifetime, puffs[i].alpha, env, distSq,
-                        camPos.x, camPos.y, camPos.z,
-                        puffs[i].pos.x, puffs[i].pos.y, puffs[i].pos.z);
-                    s_cullLogs++;
+                    const float dSq = (puffs[i].pos - camPos).MagnitudeSqr();
+                    Log("nodraw f%u puff[%d] age=%.3f/%.2f alpha=%.3f env=%.3f puffAlpha=%.3f distSq=%.0f",
+                        s_diagFrame, i, puffs[i].age, puffs[i].lifetime, puffs[i].alpha,
+                        env, puffs[i].alpha * env, dSq);
+                    dumped++;
                 }
             }
         }

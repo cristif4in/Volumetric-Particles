@@ -86,11 +86,21 @@ public:
             // SA keeps the frame delta (seconds) in ms_fTimeStep; master
             // removed the GetTimeStepInSeconds() wrapper
             const float dt = CTimer::ms_fTimeStep;
+            static int s_tick = 0;
+            const int n = ++s_tick;
+            // log every frame for the first 100, then every 500th
+            if (n <= 100 || (n % 500) == 0)
+                vp::Log("tick %d dt=%.5f UserPause=%d CodePause=%d",
+                        n, dt, (int)CTimer::m_UserPause, (int)CTimer::m_CodePause);
             SafeUpdate(dt);
         };
 
         // per-frame: draw after the world has been rendered
         plugin::Events::drawingEvent += []() {
+            static int s_draw = 0;
+            const int n = ++s_draw;
+            if (n <= 100 || (n % 500) == 0)
+                vp::Log("drawingEvent %d (cam=%p)", n, (void*)TheCamera.m_pRwCamera);
             SafeRender();
         };
     }

@@ -118,12 +118,37 @@ namespace vp
             if (!g_cfg.bEnabled)
                 return;
 
+            // verbose: every frame with active puffs, dump the simulation state
+            int active = 0;
+            for (int i = 0; i < MAX_PUFFS; i++)
+                if (s_puffs[i].active)
+                    active++;
+
             for (int i = 0; i < MAX_PUFFS; i++)
             {
                 Puff& p = s_puffs[i];
                 if (!p.active)
                     continue;
                 Simulate(p, dt);
+            }
+
+            if (active > 0)
+            {
+                static unsigned s_updateFrame = 0;
+                const unsigned f = ++s_updateFrame;
+                if (f <= 60 || (f % 60) == 0)
+                {
+                    // dump the first 3 active puffs after simulating
+                    int dumped = 0;
+                    for (int i = 0; i < MAX_PUFFS && dumped < 3; i++)
+                    {
+                        if (!s_puffs[i].active) continue;
+                        Log("sim f%u dt=%.5f puff[%d] age=%.3f/%.2f alpha=%.3f radius=%.2f pos=(%.1f,%.1f,%.1f)",
+                            f, dt, i, s_puffs[i].age, s_puffs[i].lifetime, s_puffs[i].alpha,
+                            s_puffs[i].radius, s_puffs[i].pos.x, s_puffs[i].pos.y, s_puffs[i].pos.z);
+                        dumped++;
+                    }
+                }
             }
         }
 
