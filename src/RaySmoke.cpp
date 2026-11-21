@@ -393,7 +393,7 @@ namespace vp
                 if (!s_dev) return false;
             }
 
-            const Puff* puffs = VolumetricPuffs::GetPuffs();
+            const VolumetricPuffs::Puff* puffs = VolumetricPuffs::GetPuffs();
             const int   count = VolumetricPuffs::GetPuffCount();
 
             int active = 0;
@@ -428,7 +428,7 @@ namespace vp
             IDirect3DBaseTexture9*  oldTex0 = nullptr;
             IDirect3DVertexBuffer9* oldVB = nullptr;
             IDirect3DIndexBuffer9*  oldIB = nullptr;
-            UINT oldStreamOff = 0, oldStride = 0, oldIBOff = 0, oldIBCount = 0;
+            UINT oldStreamOff = 0, oldStride = 0;
             DWORD oldFVF = 0;
             DWORD s_ZWrite = 0, s_ZTest = 0, s_AlphaBlend = 0, s_SrcBlend = 0,
                   s_DestBlend = 0, s_Cull = 0, s_Lighting = 0, s_Normalize = 0;
@@ -437,7 +437,7 @@ namespace vp
             s_dev->GetPixelShader(&oldPS);
             s_dev->GetTexture(0, &oldTex0);
             s_dev->GetStreamSource(0, &oldVB, &oldStreamOff, &oldStride);
-            s_dev->GetIndices(&oldIB, &oldIBOff, &oldIBCount);
+            s_dev->GetIndices(&oldIB, &oldIBCount);
             s_dev->GetFVF(&oldFVF);
             s_dev->GetSamplerState(0, D3DSAMP_MINFILTER, &sam0Min);
             s_dev->GetSamplerState(0, D3DSAMP_MAGFILTER, &sam0Mag);
@@ -498,7 +498,7 @@ namespace vp
 
             for (int i = 0; i < count && drawn < MAX_CUBES_PER_FRAME; i++)
             {
-                const Puff& p = puffs[i];
+                const VolumetricPuffs::Puff& p = puffs[i];
                 if (!p.active)
                     continue;
 
@@ -550,7 +550,7 @@ namespace vp
             s_dev->SetSamplerState(0, D3DSAMP_ADDRESSV,  sam0AddrV);
             s_dev->SetSamplerState(0, D3DSAMP_ADDRESSW,  sam0AddrW);
             if (oldVB) s_dev->SetStreamSource(0, oldVB, oldStreamOff, oldStride);
-            if (oldIB) s_dev->SetIndices(oldIB, oldIBOff);
+            if (oldIB) s_dev->SetIndices(oldIB);
             s_dev->SetFVF(oldFVF);
             s_dev->SetRenderState(D3DRS_ZWRITEENABLE,     s_ZWrite);
             s_dev->SetRenderState(D3DRS_ZENABLE,          s_ZTest);
