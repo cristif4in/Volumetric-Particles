@@ -29,9 +29,17 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Build plugin-sdk (plugin_sa Release)
+      # plugin-sdk master ships no .sln: it is generated with the bundled
+      # premake script. This produces plugin.sln whose Plugin_SA project
+      # builds Plugin.lib into $(PLUGIN_SDK_DIR)\output\lib.
+      - name: Generate plugin-sdk solution (premake)
         working-directory: plugin-sdk
-        run: msbuild plugin_sa.sln /p:Configuration=Release /p:Platform=Win32 /m
+        shell: cmd
+        run: tools\premake\premake5.exe vs2022 --pluginsdkdir=${{ github.workspace }}\plugin-sdk
+
+      - name: Build plugin-sdk (Plugin_SA Release)
+        working-directory: plugin-sdk
+        run: msbuild plugin.sln /p:Configuration=Release /p:Platform=Win32 /m /t:Plugin_SA
 
       - name: Build vp-cristi (Release Win32)
         env:
