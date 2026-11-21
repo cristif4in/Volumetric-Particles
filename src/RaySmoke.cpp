@@ -45,22 +45,19 @@ namespace vp
 
         // ------------------------------------------------------------ shaders
         // VS: cube vertices arrive pre-transformed in WORLD space; we only
-        // project with the game's view*proj. The object-space corner is
-        // passed through for the edge fade in the PS.
+        // project with the game's view*proj and pass the world position to
+        // the PS (the march computes everything else per-sample).
         static const char* VS_SRC =
             "float4x4 gVP : register(c0);                            \n"
             "struct VSOut {                                          \n"
-            "    float4 pos    : POSITION;                           \n"
-            "    float3 corner : TEXCOORD0;                          \n"
-            "    float3 world  : TEXCOORD1;                          \n"
+            "    float4 pos   : POSITION;                            \n"
+            "    float3 world : TEXCOORD0;                           \n"
             "};                                                      \n"
-            "VSOut VS_Main(float3 pos : POSITION0,                   \n"
-            "               float3 corner : TEXCOORD0)               \n"
+            "VSOut VS_Main(float3 pos : POSITION0)                   \n"
             "{                                                       \n"
             "    VSOut o;                                            \n"
-            "    o.pos    = mul(float4(pos, 1.0f), gVP);             \n"
-            "    o.corner = corner;                                  \n"
-            "    o.world  = pos;                                     \n"
+            "    o.pos   = mul(float4(pos, 1.0f), gVP);              \n"
+            "    o.world = pos;                                      \n"
             "    return o;                                           \n"
             "}                                                       \n";
 
@@ -77,8 +74,7 @@ namespace vp
             "float4   gParams  : register(c2); // x=groundY y=time z=alpha w=brightness \n"
             "float3   gTint    : register(c3);                       \n"
             "                                                      \n"
-            "float4 PS_Main(float3 corner : TEXCOORD0,               \n"
-            "               float3 world  : TEXCOORD1) : COLOR       \n"
+            "float4 PS_Main(float3 world : TEXCOORD0) : COLOR        \n"
             "{                                                       \n"
             "    float3 rayDir = normalize(world - gCamPos);         \n"
             "    float  stepLen = (gCenter.w * 2.0) / 12.0;          \n"
@@ -310,8 +306,9 @@ namespace vp
 
         struct CubeVert
         {
-            float x, y, z;      // world position
-            float cx, cy, cz;   // cube corner [-1..1]
+            float x, y, z;      // world position (FVF_XYZ - the edge fade is
+                                // computed per march-sample in the PS, so no
+                                // corner attribute is needed)
         };
 
         // unit cube corners + 12 triangles (36 verts)
@@ -410,17 +407,35 @@ namespace vp
             const RwMatrix* camWorld = RwFrameGetLTM(RwCameraGetFrame(cam));
             const float camX = camWorld->pos.x, camY = camWorld->pos.y, camZ = camWorld->pos.z;
 
-            // grab the game's view & projection transforms (set by the RW
-            // pipeline for the active camera at this point in the frame)
-            D3DMATRIX view, proj;
-            if (FAILED(s_dev->GetTransform(D3DTS_VIEW, &view)) ||
-                FAILED(s_dev->GetTransform(D3DTS_PROJECTION, &proj)))
-            {
-                Fail("GetTransform");
-                return false;
-            }
+            // Build view*proj from the RwCamera itself. We do NOT read
+            // D3DTS_VIEW/D3DTS_PROJECTION: RW's D3D9 driver transforms
+            // geometry itself and its device transform state is not
+            // guaranteed to match the active camera at this point.
+            //
+            // Row-vector convention (v * M), z mapped into [0,1]:
+            //   view rows = RW viewMatrix (right/up/at rows, pos column)
+            //   proj = [1/vw.x, 1/vw.y, znear/far D3D perspective]
+            const RwMatrix& vm = cam->viewMatrix;
+            const RwV2   vw   = *RwCameraGetViewWindow(cam);
+            const float  zn   = RwCameraGetNearClipPlane(cam);
+            const float  zf   = RwCameraGetFarClipPlane(cam);
+            const float  xs   = (vw.x > 0.0001f) ? 1.0f / vw.x : 1.0f;
+            const float  ys   = (vw.y > 0.0001f) ? 1.0f / vw.y : 1.0f;
+
+            float viewM[16] = {
+                vm.right.x, vm.right.y, vm.right.z, 0.0f,
+                vm.up.x,    vm.up.y,    vm.up.z,    0.0f,
+                vm.at.x,    vm.at.y,    vm.at.z,    0.0f,
+                vm.pos.x,   vm.pos.y,   vm.pos.z,   1.0f
+            };
+            float projM[16] = {
+                xs, 0.0f, 0.0f, 0.0f,
+                0.0f, ys, 0.0f, 0.0f,
+                0.0f, 0.0f, zf / (zf - zn), 1.0f,
+                0.0f, 0.0f, -zn * zf / (zf - zn), 0.0f
+            };
             float vp[16];
-            MatMul((const float*)view.m, (const float*)proj.m, vp);
+            MatMul(viewM, projM, vp);
 
             // ------------------------------------------------ save states
             IDirect3DVertexShader9* oldVS = nullptr;
@@ -464,7 +479,9 @@ namespace vp
             s_dev->SetRenderState(D3DRS_LIGHTING,         FALSE);
             s_dev->SetVertexShader(s_vs);
             s_dev->SetPixelShader(s_ps);
-            s_dev->SetFVF(0);
+            // cube verts are plain XYZ - FVF (not declaration) keeps us
+            // compatible with the RW pipeline's fixed-function drawing
+            s_dev->SetFVF(D3DFVF_XYZ);
             // pixel shader declares gNoise at register(s0) -> device sampler 0
             s_dev->SetTexture(0, s_noiseVol);
             s_dev->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
@@ -530,10 +547,42 @@ namespace vp
                     out[vI].x = p.pos.x + c[0] * p.radius;
                     out[vI].y = p.pos.y + c[1] * p.radius;
                     out[vI].z = p.pos.z + c[2] * p.radius;
-                    out[vI].cx = c[0]; out[vI].cy = c[1]; out[vI].cz = c[2];
                 }
 
-                s_dev->DrawPrimitive(D3DPT_TRIANGLELIST, drawn * 36, 12);
+                // screen-space sanity: where does this cube's center project?
+                // (row-major v*M) - healthy frames land inside [0,1]x[0,1]
+                {
+                    const float* m = vp;
+                    const float wx = p.pos.x, wy = p.pos.y, wz = p.pos.z;
+                    const float cx = wx * m[0] + wy * m[4] + wz * m[8]  + m[12];
+                    const float cy = wx * m[1] + wy * m[5] + wz * m[9]  + m[13];
+                    const float cz = wx * m[2] + wy * m[6] + wz * m[10] + m[14];
+                    const float cw = wx * m[3] + wy * m[7] + wz * m[11] + m[15];
+                    static unsigned s_rayFrame = 0;
+                    const unsigned f = ++s_rayFrame;
+                    if (f <= 5 || (f % 120) == 0)
+                        Log("raysmoke f%u cube=%d screen=(%.3f,%.3f) clipZ=%.3f w=%.2f "
+                            "radius=%.2f puffAlpha=%.3f distSq=%.0f",
+                            f, drawn,
+                            (cw != 0.0f ? cx / cw : -9.0f),
+                            (cw != 0.0f ? cy / cw : -9.0f),
+                            (cw != 0.0f ? cz / cw : -9.0f), cw,
+                            p.radius, puffAlpha, distSq);
+                }
+
+                // one-time draw verification: D3D9 draw calls fail silently
+                // when the vertex declaration is missing/mismatched
+                if (drawn == 0)
+                {
+                    HRESULT dhr = s_dev->DrawPrimitive(D3DPT_TRIANGLELIST, drawn * 36, 12);
+                    if (FAILED(dhr) && s_failLogs < 20)
+                        Log("raysmoke: DrawPrimitive FAILED hr=0x%08X (stride=%u fvf=%X)",
+                            (unsigned)dhr, (unsigned)sizeof(CubeVert), (unsigned)D3DFVF_XYZ);
+                }
+                else
+                {
+                    s_dev->DrawPrimitive(D3DPT_TRIANGLELIST, drawn * 36, 12);
+                }
                 drawn++;
             }
 
