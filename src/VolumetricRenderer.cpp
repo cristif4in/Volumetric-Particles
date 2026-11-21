@@ -132,6 +132,12 @@ namespace vp
             camRight.Normalize();
             camUp.Normalize();
 
+            // the camera's WORLD position - viewMatrix.pos is the negated
+            // view transform (its magnitude is the distance from the world
+            // origin), using it for the distance cull culled every puff
+            const RwMatrix* camWorldMat = RwFrameGetLTM(RwCameraGetFrame(cam));
+            const CVector camPos(camWorldMat->pos.x, camWorldMat->pos.y, camWorldMat->pos.z);
+
             // sun/ambient tint from the current timecycle (GfX/CloudWorks-style
             // lighting). master removed m_CurrentAmbientColor/m_CurrentDirectionalColor;
             // use the per-component ambient getters and the directional
@@ -202,7 +208,6 @@ namespace vp
                     continue;
 
                 // distance cull (also cheap LOD: fewer slices far away)
-                const CVector camPos = camMat.pos;
                 const float distSq = (p.pos - camPos).MagnitudeSqr();
                 if (distSq > g_cfg.fMaxRenderDist * g_cfg.fMaxRenderDist)
                     continue;
