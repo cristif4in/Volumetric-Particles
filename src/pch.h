@@ -23,6 +23,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <random>
 
@@ -44,3 +46,24 @@ using int32  = std::int32_t;
 #include "CVehicle.h"
 #include "CGeneral.h"
 #include "CWorld.h"
+
+namespace vp
+{
+    // tiny append-only log next to gta_sa.exe - the only way to see what
+    // happened when the game dies without a crash handler
+    inline void Log(const char* fmt, ...)
+    {
+        FILE* f = nullptr;
+        if (fopen_s(&f, "vp-cristi.log", "a") != 0 || !f)
+            return;
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        fprintf(f, "[%02d:%02d:%02d.%03d] ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+        va_list ap;
+        va_start(ap, fmt);
+        vfprintf(f, fmt, ap);
+        va_end(ap);
+        fputc('\n', f);
+        fclose(f);
+    }
+}

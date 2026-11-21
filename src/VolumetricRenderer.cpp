@@ -100,9 +100,20 @@ namespace vp
             }
         }
 
+        void* GetNoiseRaster()
+        {
+            return s_noiseRaster;
+        }
+
         void Render()
         {
             if (!g_cfg.bEnabled || !s_noiseRaster)
+                return;
+
+            // don't draw anything while the game is paused / in menus -
+            // the radar and pause menu are drawn right after drawingEvent
+            // and inherit whatever render states we leave behind
+            if (CTimer::m_UserPause || CTimer::m_CodePause)
                 return;
 
             const auto* puffs = VolumetricPuffs::GetPuffs();
@@ -136,6 +147,29 @@ namespace vp
             sunDir.Normalize();
 
             // ------------------------------------------------- render states
+            // save EVERYTHING we are about to change: whatever is left set
+            // here leaks into the HUD/radar pass right after this event
+            void*  savedRaster      = nullptr;
+            void*  savedSrcBlend    = nullptr;
+            void*  savedDestBlend   = nullptr;
+            void*  savedZWrite      = nullptr;
+            void*  savedZTest       = nullptr;
+            void*  savedCull        = nullptr;
+            void*  savedShade       = nullptr;
+            void*  savedTexFilter   = nullptr;
+            void*  savedAlphaTest   = nullptr;
+            void*  savedVtxAlpha    = nullptr;
+            RwRenderStateGet(rwRENDERSTATETEXTURERASTER,      &savedRaster);
+            RwRenderStateGet(rwRENDERSTATESRCBLEND,           &savedSrcBlend);
+            RwRenderStateGet(rwRENDERSTATEDESTBLEND,          &savedDestBlend);
+            RwRenderStateGet(rwRENDERSTATEZWRITEENABLE,       &savedZWrite);
+            RwRenderStateGet(rwRENDERSTATEZTESTENABLE,        &savedZTest);
+            RwRenderStateGet(rwRENDERSTATECULLMODE,           &savedCull);
+            RwRenderStateGet(rwRENDERSTATESHADEMODE,          &savedShade);
+            RwRenderStateGet(rwRENDERSTATETEXTUREFILTER,      &savedTexFilter);
+            RwRenderStateGet(rwRENDERSTATEALPHATESTFUNCTION,  &savedAlphaTest);
+            RwRenderStateGet(rwRENDERSTATEVERTEXALPHAENABLE,  &savedVtxAlpha);
+
             RwRenderStateSet(rwRENDERSTATETEXTURERASTER, s_noiseRaster);
             RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, (void*)TRUE);
             RwRenderStateSet(rwRENDERSTATESRCBLEND, (void*)rwBLENDSRCALPHA);
@@ -256,9 +290,16 @@ namespace vp
             }
 
             // ------------------------------------------------ restore states
-            RwRenderStateSet(rwRENDERSTATEZWRITEENABLE, (void*)TRUE);
-            RwRenderStateSet(rwRENDERSTATECULLMODE, (void*)rwCULLMODECULLBACK);
-            RwRenderStateSet(rwRENDERSTATEALPHATESTFUNCTION, (void*)rwALPHATESTFUNCTIONGREATER);
+            RwRenderStateSet(rwRENDERSTATETEXTURERASTER,      savedRaster);
+            RwRenderStateSet(rwRENDERSTATESRCBLEND,           savedSrcBlend);
+            RwRenderStateSet(rwRENDERSTATEDESTBLEND,          savedDestBlend);
+            RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,       savedZWrite);
+            RwRenderStateSet(rwRENDERSTATEZTESTENABLE,        savedZTest);
+            RwRenderStateSet(rwRENDERSTATECULLMODE,           savedCull);
+            RwRenderStateSet(rwRENDERSTATESHADEMODE,          savedShade);
+            RwRenderStateSet(rwRENDERSTATETEXTUREFILTER,      savedTexFilter);
+            RwRenderStateSet(rwRENDERSTATEALPHATESTFUNCTION,  savedAlphaTest);
+            RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE,  savedVtxAlpha);
         }
     }
 }

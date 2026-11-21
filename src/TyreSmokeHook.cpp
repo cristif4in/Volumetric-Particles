@@ -34,8 +34,54 @@ namespace vp
     typedef void(__thiscall* AddParticle_t)(FxSystem_c*, const CVector&, const CVector&, float,
                                             const FxPrtMult_c&, float, float, float, bool);
 
-    static AddSingleWheelParticles_t org_AddSingleWheelParticles = nullptr;
-    static AddParticle_t             org_AddParticle             = nullptr;
+    static AddSingleWheelParticles_t org_AddSingleWheelParticles =
+        reinterpret_cast<AddSingleWheelParticles_t>(ADDR_AddSingleWheelParticles);
+    static AddParticle_t             org_AddParticle =
+        reinterpret_cast<AddParticle_t>(ADDR_FxSystemAddParticle);
+
+    // ---------------------------------------------------------- hook engine
+    // plugin-sdk master's patch::RedirectJump just overwrites the function
+    // entry with a jmp. Calling "the original" through that same address
+    // jumps straight back into our own detour -> infinite recursion ->
+    // stack overflow (this is what crashed the game ~2s after joining:
+    // SA:MP spawns FX particles on connect). So the hook is removed around
+    // every call to the original; these functions run on the game's main
+    // thread only, so the unhook->call->rehook window is safe.
+    struct AutoHook
+    {
+        uintptr_t addr;
+        void* detour;
+        uint8_t saved[5];
+        bool  installed;
+    };
+
+    static AutoHook s_hookWheels      = { ADDR_AddSingleWheelParticles, nullptr, {}, false };
+    static AutoHook s_hookAddParticle = { ADDR_FxSystemAddParticle,    nullptr, {}, false };
+
+    static void ApplyHook(AutoHook& h, bool install)
+    {
+        DWORD old = 0;
+        if (!VirtualProtect((void*)h.addr, 5, PAGE_EXECUTE_READWRITE, &old))
+        {
+            Log("hook: VirtualProtect failed for %08X", (unsigned)h.addr);
+            return;
+        }
+        if (install)
+        {
+            memcpy(h.saved, (const void*)h.addr, sizeof(h.saved));
+            uint8_t* p = (uint8_t*)h.addr;
+            p[0] = 0xE9;
+            int32_t rel = (int32_t)((uintptr_t)h.detour - (h.addr + 5));
+            memcpy(p + 1, &rel, sizeof(rel));
+        }
+        else
+        {
+            memcpy((void*)h.addr, h.saved, sizeof(h.saved));
+        }
+        FlushInstructionCache(GetCurrentProcess(), (const void*)h.addr, 5);
+        VirtualProtect((void*)h.addr, 5, old, &old);
+        h.installed = install;
+    }
 
     // ------------------------------------------------------------- helpers
     static bool IsLocalDrivenVehicle(CVehicle* veh)
@@ -60,6 +106,35 @@ namespace vp
     }
 
     // ---------------------------------------------------------- detours
+    static bool CallOriginalWheels(CVehicle* self,
+        tWheelState wheelState, uint32 wheelStatus, float suspRatio, float speed,
+        CColPoint& colPoint, CVector& pos, float outsideVector_unused,
+        int wheelIndex, bool& bloodState, uint32 flags)
+    {
+        const bool wasInstalled = s_hookWheels.installed;
+        if (wasInstalled)
+            ApplyHook(s_hookWheels, false); // original code back in place
+        const bool result = org_AddSingleWheelParticles(self, wheelState, wheelStatus, suspRatio, speed,
+                                                        colPoint, pos, outsideVector_unused,
+                                                        wheelIndex, bloodState, flags);
+        if (wasInstalled)
+            ApplyHook(s_hookWheels, true);
+        return result;
+    }
+
+    static void CallOriginalAddParticle(FxSystem_c* self,
+        const CVector& pos, const CVector& vel, float timeSince,
+        const FxPrtMult_c& fxMults, float rotZ, float lightMult,
+        float lightMultLimit, bool createLocal)
+    {
+        const bool wasInstalled = s_hookAddParticle.installed;
+        if (wasInstalled)
+            ApplyHook(s_hookAddParticle, false);
+        org_AddParticle(self, pos, vel, timeSince, fxMults, rotZ, lightMult, lightMultLimit, createLocal);
+        if (wasInstalled)
+            ApplyHook(s_hookAddParticle, true);
+    }
+
     static bool __fastcall Our_AddSingleWheelParticles(
         CVehicle* self, void* /*edx*/,
         tWheelState wheelState, uint32 wheelStatus, float suspRatio, float speed,
@@ -71,9 +146,9 @@ namespace vp
         g_currentIsLocal = g_cfg.bEnabled && (!g_cfg.bLocalVehicleOnly || IsLocalDrivenVehicle(self));
         g_lastCarVelocity = self->m_vecMoveSpeed;
 
-        return org_AddSingleWheelParticles(self, wheelState, wheelStatus, suspRatio, speed,
-                                           colPoint, pos, outsideVector_unused,
-                                           wheelIndex, bloodState, flags);
+        return CallOriginalWheels(self, wheelState, wheelStatus, suspRatio, speed,
+                                  colPoint, pos, outsideVector_unused,
+                                  wheelIndex, bloodState, flags);
     }
 
     static void __fastcall Our_AddParticle(
@@ -91,24 +166,31 @@ namespace vp
             // exhaust/damage smoke etc. keep using the same FxSystem untouched.
             if (ra >= ADDR_AddSingleWheelParticles && ra < ADDR_AddSingleWheelParticlesEnd)
             {
+                static int s_spawnLogs = 0;
+                if (s_spawnLogs++ < 5)
+                    Log("SpawnFromTyre #%d pos=(%.1f,%.1f,%.1f) veh=%p light=%.2f",
+                        s_spawnLogs, pos.x, pos.y, pos.z, (void*)g_currentVehicle, lightMult);
                 VolumetricPuffs::SpawnFromTyre(pos, vel, fxMults, lightMult, g_lastCarVelocity, g_currentVehicle);
                 return; // vanilla smoke suppressed for the local vehicle
             }
         }
 
-        org_AddParticle(self, pos, vel, timeSince, fxMults, rotZ, lightMult, lightMultLimit, createLocal);
+        CallOriginalAddParticle(self, pos, vel, timeSince, fxMults, rotZ, lightMult, lightMultLimit, createLocal);
     }
 
     // ------------------------------------------------------------- install
     void InstallTyreSmokeHooks()
     {
-        org_AddSingleWheelParticles =
-            reinterpret_cast<AddSingleWheelParticles_t>(ADDR_AddSingleWheelParticles);
-        org_AddParticle =
-            reinterpret_cast<AddParticle_t>(ADDR_FxSystemAddParticle);
+        s_hookWheels.detour      = (void*)&Our_AddSingleWheelParticles;
+        s_hookAddParticle.detour = (void*)&Our_AddParticle;
 
-        // plugin-sdk inline hooks (same mechanism RedtimesUI's HookManager wraps)
-        plugin::patch::RedirectJump(ADDR_AddSingleWheelParticles, Our_AddSingleWheelParticles);
-        plugin::patch::RedirectJump(ADDR_FxSystemAddParticle, Our_AddParticle);
+        Log("hooks: AddSingleWheelParticles @ %08X, FxSystem::AddParticle @ %08X",
+            (unsigned)ADDR_AddSingleWheelParticles, (unsigned)ADDR_FxSystemAddParticle);
+
+        // plugin-sdk patch::RedirectJump replaced with our own E9 rel32 patch
+        // that keeps the original bytes saved for the unhook->call->rehook
+        ApplyHook(s_hookWheels, true);
+        ApplyHook(s_hookAddParticle, true);
+        Log("hooks installed (wheels=%d particle=%d)", (int)s_hookWheels.installed, (int)s_hookAddParticle.installed);
     }
 }
