@@ -105,7 +105,7 @@ namespace vp
             if (!g_cfg.bEnabled || !s_noiseRaster)
                 return;
 
-            const Puff* puffs = VolumetricPuffs::GetPuffs();
+            const auto* puffs = VolumetricPuffs::GetPuffs();
             const int   count = VolumetricPuffs::GetPuffCount();
 
             RwCamera* cam = TheCamera.m_pRwCamera; // actually Scene camera; use RwCameraGetCurrent
@@ -126,9 +126,9 @@ namespace vp
             // use the per-component ambient getters and the directional
             // brightness multiplier.
             const float gain = g_cfg.fLightGain;
-            int tintR = std::clamp<int>(CTimeCycle::GetAmbientRed() * gain, 0, 255);
-            int tintG = std::clamp<int>(CTimeCycle::GetAmbientGreen() * gain, 0, 255);
-            int tintB = std::clamp<int>(CTimeCycle::GetAmbientBlue() * gain, 0, 255);
+            int tintR = std::clamp((int)(CTimeCycle::GetAmbientRed() * gain), 0, 255);
+            int tintG = std::clamp((int)(CTimeCycle::GetAmbientGreen() * gain), 0, 255);
+            int tintB = std::clamp((int)(CTimeCycle::GetAmbientBlue() * gain), 0, 255);
 
             // CloudWorks: Mie phase needs the light direction.
             // m_VectorToSun[slot] is the timecycle's vector towards the sun.
@@ -156,7 +156,7 @@ namespace vp
 
             for (int i = 0; i < count; i++)
             {
-                const Puff& p = puffs[i];
+                const auto& p = puffs[i];
                 if (!p.active)
                     continue;
 
