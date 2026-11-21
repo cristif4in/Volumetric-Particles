@@ -55,14 +55,15 @@ namespace vp
 
             p.active    = true;
             p.age       = 0.0f;
-            // vanilla SA tyre smoke lives ~1.5s; volumetrics are allowed to
-            // linger a bit longer so the "stays in the world" feel comes out
-            p.lifetime  = 2.2f + FastRandom01() * 1.3f;
+            // vanilla SA tyre smoke lives ~1.5s; big volumetrics linger longer
+            // so the "stays in the world" feel comes out
+            p.lifetime  = 2.8f + FastRandom01() * 1.5f;
             p.lifetime *= (0.6f + 0.4f * mults.m_fLife);
 
-            // radius: start tight around the tyre, expand like a real plume
-            p.radius = 0.22f * g_cfg.fSizeScale * mults.m_fSize;
-            p.growth = 0.9f * g_cfg.fSizeScale;
+            // radius: big volumetric plumes - start chunky at the tyre and
+            // expand aggressively (tune SizeScale in vp-cristi.ini to taste)
+            p.radius = 0.55f * g_cfg.fSizeScale * mults.m_fSize;
+            p.growth = 2.6f * g_cfg.fSizeScale;
 
             // opacity: vanilla alpha scaled by our density + emission settings
             p.alpha      = std::clamp(mults.m_color.alpha * g_cfg.fDensity * (0.5f + 0.5f * emission), 0.0f, 1.0f);

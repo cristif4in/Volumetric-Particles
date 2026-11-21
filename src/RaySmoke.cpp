@@ -77,12 +77,12 @@ namespace vp
             "float4 PS_Main(float3 world : TEXCOORD0) : COLOR        \n"
             "{                                                       \n"
             "    float3 rayDir = normalize(world - gCamPos);         \n"
-            "    float  stepLen = (gCenter.w * 2.0) / 12.0;          \n"
+            "    float  stepLen = (gCenter.w * 2.0) / 16.0;          \n"
             "    float4 acc = 0;                                     \n"
             "    float3 p = world;                                   \n"
             "                                                      \n"
             "    [unroll]                                            \n"
-            "    for (int i = 0; i < 12; i++)                        \n"
+            "    for (int i = 0; i < 16; i++)                        \n"
             "    {                                                   \n"
             "        float3 rel = (p - gCenter.xyz) / gCenter.w;     \n"
             "        float edge = max(max(abs(rel.x), abs(rel.y)), abs(rel.z)); \n"
@@ -407,15 +407,17 @@ namespace vp
             const RwMatrix* camWorld = RwFrameGetLTM(RwCameraGetFrame(cam));
             const float camX = camWorld->pos.x, camY = camWorld->pos.y, camZ = camWorld->pos.z;
 
-            // Build view*proj from the RwCamera itself. We do NOT read
-            // D3DTS_VIEW/D3DTS_PROJECTION: RW's D3D9 driver transforms
-            // geometry itself and its device transform state is not
-            // guaranteed to match the active camera at this point.
+            // Build view*proj from the camera frame's WORLD matrix (its LTM
+            // is proven correct - the distance culling uses it every frame).
+            // cam->viewMatrix was tried first and is NOT "rows=axes,
+            // pos=-R*c" in master's RW headers (the screen diagnostics showed
+            // clip.w=7.78 where the true view depth was ~2.3), so invert the
+            // world matrix by hand instead.
             //
             // Row-vector convention (v * M), z mapped into [0,1]:
-            //   view rows = RW viewMatrix (right/up/at rows, pos column)
-            //   proj = [1/vw.x, 1/vw.y, znear/far D3D perspective]
-            const RwMatrix& vm = cam->viewMatrix;
+            //   view rows = camera axes with translation -axis*camPos
+            //   proj = standard D3D perspective from viewWindow + clip planes
+            const RwMatrix& w = *camWorld;
             const RwV2d vw = *RwCameraGetViewWindow(cam);
             const float  zn   = RwCameraGetNearClipPlane(cam);
             const float  zf   = RwCameraGetFarClipPlane(cam);
@@ -423,10 +425,10 @@ namespace vp
             const float  ys   = (vw.y > 0.0001f) ? 1.0f / vw.y : 1.0f;
 
             float viewM[16] = {
-                vm.right.x, vm.right.y, vm.right.z, 0.0f,
-                vm.up.x,    vm.up.y,    vm.up.z,    0.0f,
-                vm.at.x,    vm.at.y,    vm.at.z,    0.0f,
-                vm.pos.x,   vm.pos.y,   vm.pos.z,   1.0f
+                w.right.x, w.right.y, w.right.z, -(w.right.x * camX + w.right.y * camY + w.right.z * camZ),
+                w.up.x,    w.up.y,    w.up.z,    -(w.up.x    * camX + w.up.y    * camY + w.up.z    * camZ),
+                w.at.x,    w.at.y,    w.at.z,    -(w.at.x    * camX + w.at.y    * camY + w.at.z    * camZ),
+                0.0f, 0.0f, 0.0f, 1.0f
             };
             float projM[16] = {
                 xs, 0.0f, 0.0f, 0.0f,
@@ -436,6 +438,15 @@ namespace vp
             };
             float vp[16];
             MatMul(viewM, projM, vp);
+
+            // HLSL packs float4x4 constants COLUMN-major: register k holds
+            // column k. Our matrix is row-major, so upload the TRANSPOSE -
+            // then mul(float4(pos,1), gVP) in the shader performs the same
+            // v*M the CPU diagnostics validated.
+            float vpT[16];
+            for (int r = 0; r < 4; r++)
+                for (int c = 0; c < 4; c++)
+                    vpT[c * 4 + r] = vp[r * 4 + c];
 
             // ------------------------------------------------ save states
             IDirect3DVertexShader9* oldVS = nullptr;
@@ -501,7 +512,7 @@ namespace vp
             s_dev->SetPixelShaderConstantF(0, psC0, 1);
             s_dev->SetPixelShaderConstantF(3, tint, 1);
             // VS constant: view*proj (same for every cube this frame)
-            s_dev->SetVertexShaderConstantF(0, vp, 4);
+            s_dev->SetVertexShaderConstantF(0, vpT, 4);
             s_dev->SetStreamSource(0, s_cubeVB, 0, sizeof(CubeVert));
 
             // ------------------------------------------------ draw cubes
