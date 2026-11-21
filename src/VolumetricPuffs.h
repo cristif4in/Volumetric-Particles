@@ -45,9 +45,8 @@ namespace vp
         // Simulation step, called once per frame.
         void Update(float dt);
 
-        Puff*       GetPuffs();
-        const Puff* GetPuffs();
-        int         GetPuffCount();
+        Puff* GetPuffs();
+        int   GetPuffCount();
 
         float GetAmbientLight(); // current sun/ambient tint strength 0..1
     }

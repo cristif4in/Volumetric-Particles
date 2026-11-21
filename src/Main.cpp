@@ -43,7 +43,9 @@ public:
 
         // per-frame: simulate the puffs with the game's timestep
         plugin::Events::gameProcessEvent += []() {
-            const float dt = CTimer::GetTimeStepInSeconds();
+            // SA keeps the frame delta (seconds) in ms_fTimeStep; master
+            // removed the GetTimeStepInSeconds() wrapper
+            const float dt = CTimer::ms_fTimeStep;
             vp::VolumetricPuffs::Update(dt);
         };
 

@@ -114,25 +114,26 @@ namespace vp
 
             // camera basis - slices are perpendicular to the view direction
             const RwMatrix& camMat = cam->viewMatrix;
-            CVector camFwd(&camMat.at.x);  // view 'at' axis
-            CVector camRight(&camMat.right.x);
-            CVector camUp(&camMat.up.x);
-            camFwd.Normalise();
-            camRight.Normalise();
-            camUp.Normalise();
+            CVector camFwd(camMat.at.x, camMat.at.y, camMat.at.z);    // view 'at' axis
+            CVector camRight(camMat.right.x, camMat.right.y, camMat.right.z);
+            CVector camUp(camMat.up.x, camMat.up.y, camMat.up.z);
+            camFwd.Normalize();
+            camRight.Normalize();
+            camUp.Normalize();
 
-            // sun/ambient tint from the current timecycle (GfX/CloudWorks-style lighting)
-            CRGBA amb   = CTimeCycle::m_CurrentAmbientColor;
-            CRGBA dirC  = CTimeCycle::m_CurrentDirectionalColor;
+            // sun/ambient tint from the current timecycle (GfX/CloudWorks-style
+            // lighting). master removed m_CurrentAmbientColor/m_CurrentDirectionalColor;
+            // use the per-component ambient getters and the directional
+            // brightness multiplier.
             const float gain = g_cfg.fLightGain;
-            int tintR = std::clamp<int>((amb.r * 0.6f + dirC.r * 0.4f) * gain, 0, 255);
-            int tintG = std::clamp<int>((amb.g * 0.6f + dirC.g * 0.4f) * gain, 0, 255);
-            int tintB = std::clamp<int>((amb.b * 0.6f + dirC.b * 0.4f) * gain, 0, 255);
+            int tintR = std::clamp<int>(CTimeCycle::GetAmbientRed() * gain, 0, 255);
+            int tintG = std::clamp<int>(CTimeCycle::GetAmbientGreen() * gain, 0, 255);
+            int tintB = std::clamp<int>(CTimeCycle::GetAmbientBlue() * gain, 0, 255);
 
             // CloudWorks: Mie phase needs the light direction.
             // m_VectorToSun[slot] is the timecycle's vector towards the sun.
             CVector sunDir = CTimeCycle::m_VectorToSun[0];
-            sunDir.Normalise();
+            sunDir.Normalize();
 
             // ------------------------------------------------- render states
             RwRenderStateSet(rwRENDERSTATETEXTURERASTER, s_noiseRaster);
@@ -168,7 +169,7 @@ namespace vp
 
                 // distance cull (also cheap LOD: fewer slices far away)
                 const CVector camPos = camMat.pos;
-                const float distSq = (p.pos - camPos).SquaredMagnitude();
+                const float distSq = (p.pos - camPos).MagnitudeSqr();
                 if (distSq > g_cfg.fMaxRenderDist * g_cfg.fMaxRenderDist)
                     continue;
                 const int sliceCount = distSq > 40.0f * 40.0f ? std::max(3, slices / 2) : slices;
@@ -230,7 +231,8 @@ namespace vp
                     for (int k = 0; k < 4; k++)
                     {
                         RwIm3DVertexSetRGBA(&v[k], r, g, b, a);
-                        RwIm3DVertexSetSurfaceProperties(&v[k], 1.0f, 1.0f); // specular/ambient neutral
+                        // master's rw headers no longer expose
+                        // RwIm3DVertexSetSurfaceProperties; the defaults are fine
                     }
 
                     vi += 4;
@@ -238,7 +240,7 @@ namespace vp
 
                 // draw this puff (indices cover only the used slices:
                 // they are laid out for MAX_SLICES, so regenerate the tail)
-                RwIm3DTransform(s_verts, vi, &identity, rwIM3D_VERTEXALPHA);
+                RwIm3DTransform(s_verts, vi, &identity, rwIM3D_VERTEXRGBA);
                 {
                     int ii = 0;
                     RwImVertexIndex idx[(MAX_SLICES - 1) * 6];
@@ -248,7 +250,7 @@ namespace vp
                         idx[ii++] = q + 0; idx[ii++] = q + 1; idx[ii++] = q + 2;
                         idx[ii++] = q + 0; idx[ii++] = q + 2; idx[ii++] = q + 3;
                     }
-                    RwIm3DRenderIndexedPrimitive(rpPRIMTYPETRILIST, idx, ii);
+                    RwIm3DRenderIndexedPrimitive(rwPRIMTYPETRILIST, idx, ii);
                 }
                 RwIm3DEnd();
             }

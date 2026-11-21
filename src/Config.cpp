@@ -17,9 +17,10 @@ namespace vp
 
     bool Config::Load()
     {
-        // plugin-sdk resolves the module path of the asi itself
+        // plugin-sdk master removed getDataFilePath(); GAME_PATH() from
+        // extensions/Paths.h resolves to the game directory instead
         char iniPath[MAX_PATH];
-        plugin::getDataFilePath(iniPath, "vp-cristi.ini");
+        strcpy_s(iniPath, GAME_PATH("vp-cristi.ini"));
 
         auto ival = [&](const char* key, int def) { return GetPrivateProfileIntA("vp", key, def, iniPath); };
         auto fval = [&](const char* key, float def) {
@@ -38,7 +39,7 @@ namespace vp
         fBuoyancy         = fval("Buoyancy", fBuoyancy);
         fWindAmount       = fval("WindAmount", fWindAmount);
         fCarVelInherit    = fval("CarVelInherit", fCarVelInherit);
-        nSlices           = std::clamp(ival("Slices", nSlices), 3, 10);
+        nSlices           = std::clamp<int>(ival("Slices", nSlices), 3, 10);
         fMaxRenderDist    = fval("MaxRenderDist", fMaxRenderDist);
         fLightGain        = fval("LightGain", fLightGain);
 

@@ -65,7 +65,7 @@ namespace vp
             p.growth = 0.9f * g_cfg.fSizeScale;
 
             // opacity: vanilla alpha scaled by our density + emission settings
-            p.alpha      = std::clamp(mults.m_Color.alpha * g_cfg.fDensity * (0.5f + 0.5f * emission), 0.0f, 1.0f);
+            p.alpha      = std::clamp(mults.m_color.alpha * g_cfg.fDensity * (0.5f + 0.5f * emission), 0.0f, 1.0f);
             p.brightness = lightMult;
 
             // velocity: mix the vanilla kick (sideways puff) with the car's
@@ -99,7 +99,7 @@ namespace vp
 
             // wind advection
             CVector wind = CWeather::WindDir;
-            wind.Normalise();
+            wind.Normalize();
             p.vel.x += wind.x * CWeather::Wind * g_cfg.fWindAmount * dt;
             p.vel.y += wind.y * CWeather::Wind * g_cfg.fWindAmount * dt;
 
@@ -128,17 +128,18 @@ namespace vp
         }
 
         // ------------------------------------------------------- access
-        Puff*       GetPuffs()        { return s_puffs; }
-        const Puff* GetPuffs()        { return s_puffs; }
-        int         GetPuffCount()    { return MAX_PUFFS; }
+        Puff* GetPuffs()             { return s_puffs; }
+        int   GetPuffCount()         { return MAX_PUFFS; }
 
         // ------------------------------------------------------- lighting
         // Cheap "sun/sky" term: CTimeCycle ambient colour luminance,
         // so the smoke is bright at noon, dim at night, tinted at sunset.
+        // master removed m_CurrentAmbientColor; use the per-component getters
         float GetAmbientLight()
         {
-            CRGBA amb = CTimeCycle::m_CurrentAmbientColor;
-            float lum = (amb.r * 0.30f + amb.g * 0.59f + amb.b * 0.11f) / 255.0f;
+            float lum = (CTimeCycle::GetAmbientRed() * 0.30f
+                       + CTimeCycle::GetAmbientGreen() * 0.59f
+                       + CTimeCycle::GetAmbientBlue() * 0.11f) / 255.0f;
             return std::clamp(lum, 0.0f, 1.0f);
         }
     }

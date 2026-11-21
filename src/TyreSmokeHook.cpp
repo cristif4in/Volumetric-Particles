@@ -26,8 +26,11 @@ namespace vp
     static CVector   g_lastCarVelocity;              // cached m_vecMoveSpeed for puff inheritance
 
     // ------------------------------------------------------------ originals
+    // master's CVehicle.h declares AddSingleWheelParticles with
+    // (tWheelState, unsigned, float, float, CColPoint*, CVector*, float, int,
+    // unsigned surfaceType, bool*, unsigned) - eCarWheel no longer exists
     typedef bool(__thiscall* AddSingleWheelParticles_t)(CVehicle*, tWheelState, uint32, float, float,
-                                                        CColPoint&, CVector&, float, eCarWheel, bool&, uint32);
+                                                        CColPoint&, CVector&, float, int, bool&, uint32);
     typedef void(__thiscall* AddParticle_t)(FxSystem_c*, const CVector&, const CVector&, float,
                                             const FxPrtMult_c&, float, float, float, bool);
 
@@ -50,8 +53,10 @@ namespace vp
         // SA:MP quirk: the local player ped can be a passenger in some
         // gamemodes - the user wants volumetrics on "what you're driving",
         // so also accept the vehicle whose driver is the local ped.
+        // (master removed CPed::IsLocalPlayer())
+        CPed* localPed = CWorld::Players[CWorld::PlayerInFocus].m_pPed;
         CPed* driver = veh->m_pDriver;
-        return driver && driver->IsLocalPlayer();
+        return driver && driver == localPed;
     }
 
     // ---------------------------------------------------------- detours
@@ -59,7 +64,7 @@ namespace vp
         CVehicle* self, void* /*edx*/,
         tWheelState wheelState, uint32 wheelStatus, float suspRatio, float speed,
         CColPoint& colPoint, CVector& pos, float outsideVector_unused,
-        eCarWheel wheelIndex, bool& bloodState, uint32 flags)
+        int wheelIndex, bool& bloodState, uint32 flags)
     {
         // remember context so the AddParticle detour can attribute puffs
         g_currentVehicle = self;
